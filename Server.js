@@ -702,74 +702,85 @@ app.get("/entries/eventId/:entryId", (request, response) => {
 //   db.close();
 // });
 
-app.get("/events/total/all/:profileId", (request, response) => {
-  let db = new sqlite3.Database("db/moi-app");
+const dbSelectCall = async (selectQuery, data) => {
+  return new Promise((resolve, reject) => {
+    let db = new sqlite3.Database("db/moi-app");
+
+    db.all(selectQuery, data, (err, result) => {
+      if (err) {
+        db.close();
+        return reject(err);
+      }
+      db.close();
+      resolve(result);
+    });
+  });
+};
+app.get("/events/total/all/:profileId", async (request, response) => {
   console.log("get all events for Single Profile");
 
-  const selectQuery =
+  const selectEventQuery =
     "SELECT eventId, eventType, name, place, date, profileId from events WHERE profileId = ?";
 
-  db.all(selectQuery, [request.params.profileId], async (err, eventslist) => {
-    console.log("request.params.profileId : " + request.params.profileId);
-    console.log("eventslist : " + JSON.stringify(eventslist));
-    console.log("error :" + err);
+  const eventsList = await dbSelectCall(selectEventQuery, [
+    request.params.profileId,
+  ]);
 
-    // const eventsListForSingleProfile = JSON.stringify(eventslist);
-    // console.log("eventslist for SingleProfile : " + eventsListForSingleProfile);
+  if (eventsList) {
+    console.log("EventList - " + JSON.stringify(eventsList));
 
-    if (err) {
-      response.json({
-        message: err.message,
-      });
-    } else {
-      console.log("eventslist inside in else : " + eventslist);
-      let totalFromSingleEvent = [];
+    let totalEventsResult = [];
 
-      eventslist.forEach((singleEvent) => {
-        // get entries from single Event
-        console.log("singleEvent :" + JSON.stringify(singleEvent));
+    for (let index = 0; index < eventsList.length; index++) {
+      const singleEvent = eventsList[index];
+      console.log("singleEvent :" + JSON.stringify(singleEvent));
 
-        const getEntryListQuery =
-          "SELECT entryId, personName, city, presentType, amount, gift, eventId from entries WHERE eventId = ?";
+      const getEntryListQuery =
+        "SELECT entryId, personName, city, presentType, amount, gift, eventId from entries WHERE eventId = ?";
 
-        let totalAmount = 0;
-        let totalGift = 0;
-
-        db.all(getEntryListQuery, [singleEvent.eventId], (err, entriesList) => {
-          console.log("entriesList : " + JSON.stringify(entriesList));
-          if (err) {
-            response.json({
-              message: err.message,
-            });
-            return;
+      let totalAmount = 0;
+      let totalGift = 0;
+      const entryList = await dbSelectCall(getEntryListQuery, [
+        singleEvent.eventId,
+      ]);
+      console.log(
+        "Entry List Result for event " +
+          singleEvent.eventId +
+          " - " +
+          JSON.stringify(entryList)
+      );
+      if (entryList) {
+        console.log("entriesList : " + JSON.stringify(entryList));
+        totalAmount = 0;
+        totalGift = 0;
+        entryList.forEach((singleentry) => {
+          if (singleentry.presentType === "gift") {
+            totalGift += 1;
           } else {
-            entriesList.forEach((singleentry) => {
-              totalAmount += singleentry.amount;
-            });
-            entriesList.forEach((singleentry) => {
-              if (singleentry.presentType === "gift") {
-                totalGift += 1;
-              }
-            });
-            totalFromSingleEvent.push({
-              eventId: singleEvent.eventId,
-              totalAmount: totalAmount,
-              totalGift: totalGift,
-            });
-            console.log(
-              "Eventwise total : " + JSON.stringify(totalFromSingleEvent)
-            );
+            totalAmount += singleentry.amount;
           }
         });
-      });
-      // });
-      // await setTimeout(5000);
-      await new Promise((r) => window.setTimeout(r, 5000));
-      console.log("total from response : " + totalFromSingleEvent);
-      response.json(totalFromSingleEvent);
+        totalEventsResult.push({
+          eventId: singleEvent.eventId,
+          totalAmount: totalAmount,
+          totalGift: totalGift,
+        });
+        console.log(
+          "Updated total amount vs event - " + JSON.stringify(totalEventsResult)
+        );
+      } else {
+        console.log(
+          "Failed for event " + singleEvent.eventId + ", with error - " + err
+        );
+      }
     }
-  });
-  db.close();
+
+    console.log("Final REsult - " + JSON.stringify(totalEventsResult));
+    response.json(totalEventsResult);
+  } else {
+    console.log("Failed for eventlist query " + eventsList);
+    response.json(eventsList);
+  }
 });
 
 // app.get("/events/total/all/:profileId", (request, response) => {
