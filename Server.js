@@ -3,6 +3,11 @@ const cors = require("cors");
 const sqlite3 = require("sqlite3").verbose();
 // const PRAGMA foreign_keys = ON;
 const app = express();
+// import { Database } from "sqlite-async/sqlite-async";
+// const Database = require("sqlite-async");
+// const Database = sqlite - async();
+// import { setTimeout } from 'timers/promises';
+// const setTimeout = require("timers/promises");
 
 var corOptions = {
   origin: "http://localhost:3000",
@@ -115,32 +120,29 @@ app.get("/profile/:profileId", (request, response) => {
   const selectQuery =
     "SELECT profileId, name, age, gender, address, city, mobile, email from profile WHERE profileId=? ";
 
-  db.all(
-    selectQuery,
-    [parseInt(request.params.profileId)],
-    (err, profileList) => {
-      if (err) {
-        response.json({
-          message: err.message,
-        });
-      } else {
-        const profileInputs = profileList.map((singleProfile) => {
-          console.log(singleProfile);
-          return {
-            profileId: singleProfile.profileId,
-            name: singleProfile.name,
-            age: singleProfile.age,
-            gender: singleProfile.gender,
-            address: singleProfile.address,
-            city: singleProfile.city,
-            mobile: singleProfile.mobile,
-            email: singleProfile.email,
-          };
-        });
-        response.json(profileInputs[0]);
-      }
+  db.all(selectQuery, [request.params.profileId], (err, profileList) => {
+    if (err) {
+      response.json({
+        message: err.message,
+      });
+    } else {
+      const profileInputs = profileList.map((singleProfile) => {
+        console.log(singleProfile);
+        return {
+          profileId: singleProfile.profileId,
+          name: singleProfile.name,
+          age: singleProfile.age,
+          gender: singleProfile.gender,
+          address: singleProfile.address,
+          city: singleProfile.city,
+          mobile: singleProfile.mobile,
+          email: singleProfile.email,
+        };
+      });
+      response.json(profileInputs[0]);
+      console.log(profileInputs[0]);
     }
-  );
+  });
   db.close();
 });
 
@@ -707,7 +709,7 @@ app.get("/events/total/all/:profileId", (request, response) => {
   const selectQuery =
     "SELECT eventId, eventType, name, place, date, profileId from events WHERE profileId = ?";
 
-  db.all(selectQuery, [request.params.profileId], (err, eventslist) => {
+  db.all(selectQuery, [request.params.profileId], async (err, eventslist) => {
     console.log("request.params.profileId : " + request.params.profileId);
     console.log("eventslist : " + JSON.stringify(eventslist));
     console.log("error :" + err);
@@ -720,7 +722,10 @@ app.get("/events/total/all/:profileId", (request, response) => {
         message: err.message,
       });
     } else {
-      const totalFromSingleEvent = eventslist.map(async (singleEvent) => {
+      console.log("eventslist inside in else : " + eventslist);
+      let totalFromSingleEvent = [];
+
+      eventslist.forEach((singleEvent) => {
         // get entries from single Event
         console.log("singleEvent :" + JSON.stringify(singleEvent));
 
@@ -730,40 +735,110 @@ app.get("/events/total/all/:profileId", (request, response) => {
         let totalAmount = 0;
         let totalGift = 0;
 
-        await db
-          .all(getEntryListQuery, [singleEvent.eventId], (err, entriesList) => {
-            console.log("entriesList : " + JSON.stringify(entriesList));
-            if (err) {
-              response.json({
-                message: err.message,
-              });
-              return;
-            } else {
-              entriesList.forEach((singleentry) => {
-                totalAmount += singleentry.amount;
-              });
-              entriesList.forEach((singleentry) => {
-                if (singleentry.presentType === "gift") {
-                  totalGift += 1;
-                }
-              });
-            }
-          })
-          .then(() => {
-            return {
+        db.all(getEntryListQuery, [singleEvent.eventId], (err, entriesList) => {
+          console.log("entriesList : " + JSON.stringify(entriesList));
+          if (err) {
+            response.json({
+              message: err.message,
+            });
+            return;
+          } else {
+            entriesList.forEach((singleentry) => {
+              totalAmount += singleentry.amount;
+            });
+            entriesList.forEach((singleentry) => {
+              if (singleentry.presentType === "gift") {
+                totalGift += 1;
+              }
+            });
+            totalFromSingleEvent.push({
               eventId: singleEvent.eventId,
               totalAmount: totalAmount,
               totalGift: totalGift,
-            };
-          });
+            });
+            console.log(
+              "Eventwise total : " + JSON.stringify(totalFromSingleEvent)
+            );
+          }
+        });
       });
       // });
-      console.log(totalFromSingleEvent);
+      // await setTimeout(5000);
+      await new Promise((r) => window.setTimeout(r, 5000));
+      console.log("total from response : " + totalFromSingleEvent);
       response.json(totalFromSingleEvent);
     }
   });
   db.close();
 });
+
+// app.get("/events/total/all/:profileId", (request, response) => {
+//   console.log("get all events for Single Profile");
+//   // let db = new sqlite3.Database("db/moi-app");
+//   Database.open("db/moi-app").then(() => {
+//     const selectQuery =
+//       "SELECT eventId, eventType, name, place, date, profileId from events WHERE profileId = ?";
+
+//     Database.all(selectQuery, [request.params.profileId], (err, eventslist))
+//       //  => {
+//       .then(() => {
+//         console.log("request.params.profileId : " + request.params.profileId);
+//         //
+//         //     // const eventsListForSingleProfile = JSON.stringify(eventslist);
+//         //     // console.log("eventslist for SingleProfile : " + eventsListForSingleProfile);
+
+//         if (err) {
+//           response.json({
+//             message: err.message,
+//           });
+//         } else {
+//           // const totalFromSingleEvent = eventslist
+//           eventslist
+//             .map((singleEvent) => {
+//               const getEntryListQuery =
+//                 "SELECT entryId, personName, city, presentType, amount, gift, eventId from entries WHERE eventId = ?";
+
+//               let totalAmount = 0;
+//               let totalGift = 0;
+
+//               Database.all(
+//                 getEntryListQuery,
+//                 [singleEvent.eventId],
+//                 (err, entriesList)
+//               ).then(() => {
+//                 console.log("entriesList : " + entriesList);
+//                 if (err) {
+//                   response.json({
+//                     message: err.message,
+//                   });
+//                   return;
+//                 } else {
+//                   entriesList.forEach((singleentry) => {
+//                     totalAmount += singleentry.amount;
+//                   });
+//                   entriesList.forEach((singleentry) => {
+//                     if (singleentry.presentType === "gift") {
+//                       totalGift += 1;
+//                     }
+//                   });
+//                 }
+//               });
+//             })
+//             .then(() => {
+//               return {
+//                 eventId: singleEvent.eventId,
+//                 totalAmount: totalAmount,
+//                 totalGift: totalGift,
+//               };
+//             });
+//           console.log("singleEvent.eventId : " + singleEvent.eventId);
+//           console.log("totalAmount : " + totalAmount);
+//           console.log("totalGift : " + totalGift);
+//         }
+//         // response.json(totalFromSingleEvent);
+//       });
+//   });
+// });
 
 app.listen(2010, () => {
   console.log("Listening successfully - use 2010");
