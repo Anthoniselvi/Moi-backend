@@ -762,6 +762,7 @@ app.get("/events/total/all/:profileId", async (request, response) => {
         });
         totalEventsResult.push({
           eventId: singleEvent.eventId,
+          name: singleEvent.name,
           totalAmount: totalAmount,
           totalGift: totalGift,
         });
